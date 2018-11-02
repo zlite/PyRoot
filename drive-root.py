@@ -5,7 +5,7 @@ import threading
 import time
 import signal
 import curses
-stdscr = curses.initscr()
+# stdscr = curses.initscr()
 state = ""
 
 # BLE UUID's
@@ -58,8 +58,8 @@ class RootDevice(gatt.Device):
         message = []
         for byte in value:
             message.append(byte)
-        print ("Messages from Root:")
-        print(message)
+#        print ("Messages from Root:")
+#        print(message)
 
     def drive_forward(self):
         self.tx_characteristic.write_value([0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xD1])
@@ -85,7 +85,7 @@ class RootDevice(gatt.Device):
 def loop(stdscr, *args, **kwds) :
     global state
     state = ""
-    stdscr.nodelay(1)
+    stdscr.nodelay(True)
     while True:
         ch = stdscr.getch()
         if ch == -1 :
@@ -101,24 +101,53 @@ def loop(stdscr, *args, **kwds) :
             else : pass
         time.sleep(0.01)
 
-def drive_root():
+def drive_root(input):
     global state
-    while True:
-        if state == "FORWARD":
-            manager.robot.drive_forward()
-        if state == "BACKWARD":
-            manager.robot.drive_backwards()
-        if state == "RIGHT":
-            manager.robot.drive_right()
-        if state == "LEFT":
-            manager.robot.drive_left()
-        if state == "STOP":
-            manager.robot.stop()
-        if state == "UP":
-            manager.robot.pen_up()
-        if state == "DOWN":
-            manager.robot.pen_down()
-        time.sleep(0.01)
+    if input == "f":
+        print ("Drive forward")
+        manager.robot.drive_forward()
+    if input == "b":
+        print ("Drive backwards")
+        manager.robot.drive_backwards()
+    if input == "r":
+        print ("Drive right")
+        manager.robot.drive_right()
+    if input == "l":
+        print ("Drive left")
+        manager.robot.drive_left()
+    if input == "s":
+        print ("Stop")
+        manager.robot.stop()
+    if input == "u":
+        print ("Pen up")
+        manager.robot.pen_up()
+    if input == "d":
+        print ("Pen down")
+        manager.robot.pen_down()
+###
+#    elif ch == curses.KEY_DOWN : state = "BACKWARD"
+#    elif ch == curses.KEY_RIGHT : state = "RIGHT"
+#    elif ch == curses.KEY_LEFT : state = "LEFT"
+#    elif ch == ord('s') : state = "STOP"
+#    elif ch == ord('u'): state = "UP"
+#    elif ch == ord('d'): state = "DOWN"
+#    while True:
+#        if state == "FORWARD":
+#            manager.robot.drive_forward()
+#        if state == "BACKWARD":
+#            manager.robot.drive_backwards()
+#        if state == "RIGHT":
+#            manager.robot.drive_right()
+#        if state == "LEFT":
+#            manager.robot.drive_left()
+#        if state == "STOP":
+#            manager.robot.stop()
+#        if state == "UP":
+#            manager.robot.pen_up()
+#        if state == "DOWN":
+#            manager.robot.pen_down()
+#        time.sleep(0.01)
+###
 
 # start here if run as program / not imported as module
 if __name__ == "__main__":
@@ -126,13 +155,16 @@ if __name__ == "__main__":
     manager.start_discovery(service_uuids=[root_identifier_uuid])
     thread = threading.Thread(target = manager.run)
     thread.start()
-    while manager.robot is None:
-            print('Waiting...')
-            time.sleep(0.1)
+    try:
+        while manager.robot is None:
             pass # wait for a root robot to be discovered
-    print ("Found one!")
-    t1=threading.Thread(target=drive_root)
-    t1.setDaemon(True)
-    t1.start()
-    curses.wrapper(loop)  # start keyboard input thread
-        #    stopper = threading.Event()
+
+        print("Press Enter to drive robot, CTRL-C to quit")
+        while True:
+            char = input() # wait for keyboard input
+            drive_root(char)
+    except KeyboardInterrupt:
+        print("\tCTRL-C pressed")
+        manager.stop()
+        manager.robot.disconnect()
+        thread.join()
