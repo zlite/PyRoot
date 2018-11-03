@@ -53,10 +53,17 @@ class RootDevice(gatt.Device):
 
     def characteristic_value_updated(self, characteristic, value):
         message = []
+        type = ""
         for byte in value:
             message.append(byte)
 #        print ("Messages from Root:")
-#        print(message)
+        if message[0] == 4: type = "Color Sensor"
+        if message[0] == 12: type = "Bumper"
+        if message[0] == 13: type = "Light Sensor"
+        if message[0] == 17: type = "Touch Sensor"
+        if message[0] == 20: type = "Cliff Sensor"
+
+        print(type, message)
 
     def drive_forward(self):
         self.tx_characteristic.write_value([0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xD1])
@@ -114,8 +121,7 @@ if __name__ == "__main__":
     try:
         while manager.robot is None:
             pass # wait for a root robot to be discovered
-
-        print("Press letter (f,b,l,r,s,u,d) to drive robot, q to quit")
+        print("Press letter (f,b,l,r,s,u,d) to drive robot and raise pen up or down, q to quit")
         while char != "q":
             char = input() # wait for keyboard input
             drive_root(char)
