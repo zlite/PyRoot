@@ -110,16 +110,18 @@ if __name__ == "__main__":
     manager.start_discovery(service_uuids=[root_identifier_uuid])
     thread = threading.Thread(target = manager.run)
     thread.start()
+    char = ""
     try:
         while manager.robot is None:
             pass # wait for a root robot to be discovered
 
-        print("Press Enter to drive robot, CTRL-C to quit")
-        while True:
+        print("Press letter (f,b,l,r,s,u,d) to drive robot, q to quit")
+        while char != "q":
             char = input() # wait for keyboard input
             drive_root(char)
-    except KeyboardInterrupt:
-        print("\tCTRL-C pressed")
+        print("Quitting")
         manager.stop()
         manager.robot.disconnect()
         thread.join()
+    except KeyboardInterrupt:
+        pass
