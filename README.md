@@ -21,3 +21,5 @@ Instructions (from the Linux command line):
 "u" = Pen Up
 "d" = Pen Down
 "q" = Quit
+
+It will also display sensor data from the Root (such as touch and bumper sensors) when they are triggered. 
