@@ -85,13 +85,13 @@ class RootDevice(gatt.Device):
     def pen_down(self):
         self.tx_characteristic.write_value([0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-    def turn_angle(self, angle):
+    def turn_rate(self, rate):
         left = 0
         right = 0
-        if angle >= 0:
-            left = angle
-        if angle < 0:
-            right = -1*angle
+        if rate >= 0:
+            left = rate
+        if rate < 0:
+            right = -1*rate
         leftbytes = left.to_bytes(4,byteorder='big',signed=True)  # need to convert to byte string
         rightbytes = right.to_bytes(4,byteorder='big',signed=True)
         # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
@@ -122,11 +122,11 @@ def drive_root(command):
         print ("Pen down")
         manager.robot.pen_down()
     if command == "t":
-        print ("Enter turn angle (up to +-90):")
+        print ("Enter turn rate (up to +-90):")
         char = input()
-        angle = int(char)
-        print ("Turning ", angle)
-        manager.robot.turn_angle(angle)
+        rate = int(char)
+        print ("Turning ", rate)
+        manager.robot.turn_rate(rate)
 
 # start here if run as program / not imported as module
 if __name__ == "__main__":
