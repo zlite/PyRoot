@@ -18,6 +18,7 @@ Instructions (from the Linux command line):
 "f" = Forward
 "b" = Back
 "s" = Stop
+"t" = Turn (input angle)
 "u" = Pen Up
 "d" = Pen Down
 "q" = Quit
