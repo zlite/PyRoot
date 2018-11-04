@@ -86,37 +86,49 @@ class RootDevice(gatt.Device):
     def pen_down(self):
         self.tx_characteristic.write_value([0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-    def drive_angle(self, angle):
-        bytestring = angle.to_bytes(1,"little")
-        self.tx_characteristic.write_value([0x01, 0x04, 0x00, 0x00, 0x00, 0x00, bytestring, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
+    def turn_angle(self, angle):
+        left = 0
+        right = 0
+        if angle >= 0:
+            left = angle
+        if angle < 0:
+            right = -1*angle
+        leftbytes = left.to_bytes(4,byteorder='big',signed=True)  # need to convert to byte string
+        rightbytes = right.to_bytes(4,byteorder='big',signed=True)
+        # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
+        self.tx_characteristic.write_value([0x01, 0x04, 0x00, leftbytes[0], leftbytes[1], leftbytes[2], leftbytes[3], rightbytes[0], rightbytes[1], rightbytes[2], rightbytes[3], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
 
 
-def drive_root(input):
+def drive_root(command):
     global state
-    if input == "f":
+    angle = 0
+    if command == "f":
         print ("Drive forward")
         manager.robot.drive_forward()
-    if input == "b":
+    if command == "b":
         print ("Drive backwards")
         manager.robot.drive_backwards()
-    if input == "r":
+    if command == "r":
         print ("Drive right")
         manager.robot.drive_right()
-    if input == "l":
+    if command == "l":
         print ("Drive left")
         manager.robot.drive_left()
-    if input == "s":
+    if command == "s":
         print ("Stop")
         manager.robot.stop()
-    if input == "u":
+    if command == "u":
         print ("Pen up")
         manager.robot.pen_up()
-    if input == "d":
+    if command == "d":
         print ("Pen down")
         manager.robot.pen_down()
-    if input == "1":
-        print ("Pen down")
-        manager.robot.drive_angle(10)
+    if command == "t":
+        print ("Enter turn angle (up to +-90):")
+        char = input()
+        angle = int(char)
+        print ("Turning ", angle)
+        manager.robot.turn_angle(angle)
 
 # start here if run as program / not imported as module
 if __name__ == "__main__":
@@ -128,7 +140,7 @@ if __name__ == "__main__":
     try:
         while manager.robot is None:
             pass # wait for a root robot to be discovered
-        print("Press letter (f,b,l,r,s,u,d) to drive robot and raise pen up or down, q to quit")
+        print("Press letter (f,b,l,r) to drive robot (t) to turn, (s) to stop, (u or d) raise pen up or down, (q) to quit")
         while char != "q":
             char = input() # wait for keyboard input
             drive_root(char)
