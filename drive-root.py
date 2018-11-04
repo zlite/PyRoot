@@ -86,6 +86,10 @@ class RootDevice(gatt.Device):
     def pen_down(self):
         self.tx_characteristic.write_value([0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
+    def drive_angle(self, angle):
+        bytestring = angle.to_bytes(1,"little")
+        self.tx_characteristic.write_value([0x01, 0x04, 0x00, 0x00, 0x00, 0x00, bytestring, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
+
 
 def drive_root(input):
     global state
@@ -110,6 +114,9 @@ def drive_root(input):
     if input == "d":
         print ("Pen down")
         manager.robot.pen_down()
+    if input == "1":
+        print ("Pen down")
+        manager.robot.drive_angle(10)
 
 # start here if run as program / not imported as module
 if __name__ == "__main__":
