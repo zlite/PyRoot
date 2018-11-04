@@ -23,3 +23,7 @@ Instructions (from the Linux command line):
 "q" = Quit
 
 It will also display sensor data from the Root (such as touch and bumper sensors) when they are triggered. 
+
+The full Root API is here, if you want to add to this: https://github.com/RootRobotics/root-robot-ble-protocol
+
+Thanks to https://github.com/mogenson for all the help!
