@@ -2,7 +2,6 @@
 
 import gatt
 import threading
-import time
 
 
 # BLE UUID's
@@ -100,7 +99,6 @@ class RootDevice(gatt.Device):
 
 
 def drive_root(command):
-    global state
     angle = 0
     if command == "f":
         print ("Drive forward")
