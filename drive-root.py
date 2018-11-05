@@ -97,6 +97,12 @@ class RootDevice(gatt.Device):
         # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
         self.tx_characteristic.write_value([0x01, 0x04, 0x00, leftbytes[0], leftbytes[1], leftbytes[2], leftbytes[3], rightbytes[0], rightbytes[1], rightbytes[2], rightbytes[3], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
 
+    def steer(self, left, right):
+        leftbytes = left.to_bytes(4,byteorder='big',signed=True)  # need to convert to byte string
+        rightbytes = right.to_bytes(4,byteorder='big',signed=True)
+        # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
+        self.tx_characteristic.write_value([0x01, 0x04, 0x00, leftbytes[0], leftbytes[1], leftbytes[2], leftbytes[3], rightbytes[0], rightbytes[1], rightbytes[2], rightbytes[3], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
+
 
 def drive_root(command):
     angle = 0
@@ -127,6 +133,9 @@ def drive_root(command):
         rate = int(char)
         print ("Turning ", rate)
         manager.robot.turn_rate(rate)
+    if command == "p":
+        print ("Steer")
+        manager.robot.steer(30,40)
 
 # start here if run as program / not imported as module
 if __name__ == "__main__":

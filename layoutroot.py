@@ -16,6 +16,7 @@ import logging
 import csv
 import gatt
 import threading
+from envirophat import motion
 
 
 # BLE UUID's
@@ -30,9 +31,9 @@ kp = 0.6   # P term of the PID
 ki = 0.0     # I term of the PID
 kd = 0.4    # D term of the PID
 gain = 1
-cruise_speed = 150  # up to 400
+cruise_speed = 50  # up to 400
 temp_speed = cruise_speed
-steering_gain = 2.0 #
+steering_gain = 1.0 #
 
 OffsetX= (-412+450)/2 # compass calibrated min and max values for X
 OffsetY= (-1000+-50)/2 # compass calibrated min and max values for X
@@ -155,6 +156,31 @@ class RootDevice(gatt.Device):
     def pen_down(self):
         self.tx_characteristic.write_value([0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
+    def turn_rate(self, rate):
+        left = 0
+        right = 0
+        if rate >= 0:
+            left = rate
+        if rate < 0:
+            right = -1*rate
+        leftbytes = left.to_bytes(4,byteorder='big',signed=True)  # need to convert to byte string
+        rightbytes = right.to_bytes(4,byteorder='big',signed=True)
+        # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
+        self.tx_characteristic.write_value([0x01, 0x04, 0x00, leftbytes[0], leftbytes[1], leftbytes[2], leftbytes[3], rightbytes[0], rightbytes[1], rightbytes[2], rightbytes[3], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
+
+    def turn(self, direction):
+        left = cruise_speed + direction * 20
+        right = cruise_speed - direction * 20
+        leftbytes = left.to_bytes(4,byteorder='big',signed=True)  # need to convert to byte string
+        rightbytes = right.to_bytes(4,byteorder='big',signed=True)
+        # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
+        self.tx_characteristic.write_value([0x01, 0x04, 0x00, leftbytes[0], leftbytes[1], leftbytes[2], leftbytes[3], rightbytes[0], rightbytes[1], rightbytes[2], rightbytes[3], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
+
+    def steer(self, left, right):
+        leftbytes = left.to_bytes(4,byteorder='big',signed=True)  # need to convert to byte string
+        rightbytes = right.to_bytes(4,byteorder='big',signed=True)
+        # note that we're not dynamically calculating the CRC at the end, so just leaving it 0 (unchecked)
+        self.tx_characteristic.write_value([0x01, 0x04, 0x00, leftbytes[0], leftbytes[1], leftbytes[2], leftbytes[3], rightbytes[0], rightbytes[1], rightbytes[2], rightbytes[3], 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0])
 
 
 def constrain(value, min, max):
@@ -180,17 +206,24 @@ def update_pid(measured_angle, set_angle):
     return output
 
 def get_heading(): # use this if you've got paired beacons
-        pair_id = hedge.valuesUltrasoundPosition[0][0] # if using paired beacons
-        pair_heading = hedge.valuesUltrasoundPosition[0][4]
-        heading = 360-(pair_heading/10)  # reverse direction to correspond the waypoint coordinate system
-        heading = 180 + heading  # rotate by 180 degrees to correspond to waypoint coordinate system
-        if heading > 360:
-            heading = heading - 360
-        return heading
+        ##### Use the following if you're just using a compass
+        raw_imu = get_imu()
+        imu_correction = starting_heading - raw_imu
+        imu = raw_imu + imu_correction
+        imu = correct_imu(raw_imu, imu_correction)
+        return imu
+        ####### Use the following section if you have paired beacons
+        # pair_id = hedge.valuesUltrasoundPosition[0][0] # if using paired beacons
+        # pair_heading = hedge.valuesUltrasoundPosition[0][4]
+        # heading = 360-(pair_heading/10)  # reverse direction to correspond the waypoint coordinate system
+        # heading = 180 + heading  # rotate by 180 degrees to correspond to waypoint coordinate system
+        # if heading > 360:
+        #     heading = heading - 360
+        # return heading
 
 def get_imu():
-    heading, roll, pitch = bno.read_euler()
-    return heading
+    mag_values = motion.magnetometer()
+    return mag_values[2]
 
 def get_position():
     global position
@@ -238,7 +271,7 @@ def navigate():
         get_position()
         print ('Slow turning')
         rotate(heading, desired_angle)  # rotate until you're close
-        bot.drive_stop()
+        manager.robot.stop()
         time.sleep(4)  # give it time to settle
         get_position()   # reset heading
         print ('Going straight')
@@ -252,14 +285,12 @@ def navigate():
             last_range = range
             range = get_range()   # check range
             fine_steer(desired_angle, imu_correction)
-            sensor_state = bot.get_sensors()   # check with the wheel encoders to see how far you've gone
-            distance = distance + abs(sensor_state.distance/1000)
             current_time = int(round(time.time() * 1000))
             delta_time = current_time - last_time
             range = get_range()
             print ('Range = ', range)
             if (delta_time > 6000) and (range > 1):  # stop every six seconds while travelling, as long as you're more than 1 m from target
-                bot.drive_stop()
+                manager.robot.stop()
                 print ('Recalibrating')
                 time.sleep(3)  # give it time to settle
                 get_position()   # reset heading
@@ -273,16 +304,15 @@ def navigate():
             waypoint_num = 1
         print ('Next waypoint is:', waypoint_num)
 
-
 def motors(steer_angle):
         steer_angle = radians_degrees * math.tan(steer_angle/radians_degrees) # take the tangent to create a non-linear response curve
         print('Steer_angle:', round(steer_angle,3))
         left = int((temp_speed)+(steer_angle*steering_gain))
-        left = constrain (left, -500, 500)
+        left = constrain (left, -100, 100)
         right = int((temp_speed)-(steer_angle*steering_gain))
-        right = constrain (right, -500, 500)
+        right = constrain (right, -100, 100)
         print('Left: ', left, 'Right: ', right)
-        bot.drive_direct(right,left)  # now turn at angle proportional to PID output.
+        manager.robot.steer(left,right)
 
 def correct_imu(raw_imu, imu_correction):
         imu = raw_imu + imu_correction
@@ -303,12 +333,12 @@ def rotate (starting_heading, desired_angle):
         imu = correct_imu(raw_imu, imu_correction)
         direction = dir(imu, desired_angle)
         while (imu < desired_angle -5) or (imu > desired_angle + 5):  # do the coarse roation fast
-            bot.drive_turn(20, direction)  # turn in the correct direction until in the above target zone
+            manager.robot.turn(direction)
             raw_imu = get_imu()
             imu = correct_imu(raw_imu, imu_correction)
             direction = dir(imu, desired_angle)
             print("Coarse rotation angle: ", imu, "Target angle: ", desired_angle, 'IMU Correction: ', imu_correction)
-        bot.drive_stop()
+        manager.robot.stop()
         time.sleep(4) # pause to let measurements settle
         get_position()  # update heading
         raw_imu = get_imu()
@@ -317,13 +347,12 @@ def rotate (starting_heading, desired_angle):
         direction = dir(imu, desired_angle)
         print ('Starting fine rotation')
         while (imu < desired_angle - 2) or (imu > desired_angle + 2):  # do the fine rotation slow
-            bot.drive_turn(20, direction)  # turn in the correct direction until in the above target zone
+            manager.robot.turn(direction)
             raw_imu = get_imu()
             imu = correct_imu(raw_imu, imu_correction)
             direction = dir(imu, desired_angle)
             print("Fine rotation angle: ", imu, "Target angle: ", desired_angle, 'IMU Correction: ', imu_correction)
-        bot.drive_stop()
-        sensor_state = bot.get_sensors()   # reset wheel encoders
+        manager.robot.stop()
         return imu
 
 def fine_steer(desired_angle, imu_correction): # do this one with the onboard IMU
@@ -374,16 +403,15 @@ def main():
     try:
         while manager.robot is None:
             pass # wait for a root robot to be discovered
-        print("Press letter (f,b,l,r,s,u,d) to drive robot and raise pen up or down, q to quit")
-        bot.drive_straight(30)  # start by driving straight for one second so everything can settle
+        manager.robot.drive_forward()
         time.sleep(1)
         while char != "q":
             while waypoint_num < waypoint_total:
                 char = input() # wait for keyboard input
-                navigate()
+                navigate()     # do all the steering work here
             print ('Mission finished')
             hedge.stop()  # stop and close serial port
-            bot.drive_stop()
+            manager.robot.stop()
             sys.exit()
         print("Quitting")
         manager.stop()
@@ -391,7 +419,6 @@ def main():
         thread.join()
     except KeyboardInterrupt:
         hedge.stop()  # stop and close serial port
-        bot.drive_stop()
-        sys.exit()
+        manager.robot.stop()
 
 main()
