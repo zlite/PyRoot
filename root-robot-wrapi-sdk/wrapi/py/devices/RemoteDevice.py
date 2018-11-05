@@ -1,2 +1,0 @@
-
-payloadSize = 16
